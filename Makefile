@@ -19,7 +19,7 @@ vpath %.h $(INC_DIR) $(SRC_DIRS)
 LIB_NAME := ctnr4c
 TARGETS := lib$(LIB_NAME).a lib$(LIB_NAME).so
 
-CFLAGS += -Wall -I$(INC_DIR) -g
+CFLAGS += -Wall -I$(INC_DIR)# -g
 SO_FLAGS := -shared -fPIC
 LD_FLAGS := -L$(LIB_DIR) -l$(LIB_NAME) -lpthread -Wl,-rpath=$(LIB_DIR)
 
