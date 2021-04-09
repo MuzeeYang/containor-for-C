@@ -5,6 +5,9 @@ INC_DIR := inc
 LIB_DIR := lib
 OUT_DIR := out
 
+$(shell if [ ! -d $(LIB_DIR) ]; then mkdir -p $(LIB_DIR); fi)
+$(shell if [ ! -d $(OUT_DIR) ]; then mkdir -p $(OUT_DIR); fi)
+
 COMPILE_PREFIX := 
 CC = $(COMPILE_PREFIX)gcc
 AR = $(COMPILE_PREFIX)ar
@@ -24,7 +27,7 @@ SO_FLAGS := -shared -fPIC
 LD_FLAGS := -L$(LIB_DIR) -l$(LIB_NAME) -lpthread -Wl,-rpath=$(LIB_DIR)
 
 all: $(TARGETS)
-	-mv $(LIB_DIR)/* $(OUT_DIR)
+	mv $(LIB_DIR)/* $(OUT_DIR)
 	@echo "done."
 
 test: test.o lib$(LIB_NAME).so
