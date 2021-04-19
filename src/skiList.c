@@ -208,7 +208,7 @@ int skiList_foreach(skiHandler_t handler, skiFunc2_t func2, void* arg)
 	PulleyNode_t* pHead = handler, *cursor = NULL;
 
 	for(cursor = pHead->next; cursor != pHead; cursor = cursor->next){
-		func2(((ListNode_t*)cursor)->data, arg);
+		if(0 == func2(((ListNode_t*)cursor)->data, arg))break;
 	}
 
 	return func2(NULL, arg);
@@ -299,7 +299,7 @@ void skiList_reCap(skiHandler_t handler, size_t capacity)
 static int __copy_node(void* data, void* handler)
 {
 	if(data)skiList_pushBack(handler, data);
-	return 0;
+	return 1;
 }
 
 skiHandler_t skiList_copy(skiHandler_t handler)
@@ -454,11 +454,13 @@ static void __merge_sort(PulleyNode_t* pHead, size_t size, skiFunc2_t cmpFunc)
 	}
 }
 
+#if 0	//for test sort
 void skiList_sort_st(skiHandler_t handler, skiFunc2_t cmpFunc)
 {
 	if(!__identifyHead(handler) || cmpFunc == NULL)return;
 	__insert_sort(handler, cmpFunc);
 }
+#endif
 
 void skiList_sort(skiHandler_t handler, skiFunc2_t cmpFunc)
 {

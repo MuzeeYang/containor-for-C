@@ -123,7 +123,7 @@ cque_failed:
 }
 
 
-int skiQue_poll(skiHandler_t handler, char rw)
+size_t skiQue_poll(skiHandler_t handler, char rw)
 {
 	if(!__identifyHead(handler))goto cque_failed;
 	CclQue_t* que = handler;
@@ -138,7 +138,8 @@ int skiQue_poll(skiHandler_t handler, char rw)
 		qData = que->data + (rIdx&que->capacity) * (que->dataSize+1);
 	}
 
-	return wIdx - rIdx;
+	if((rIdx&que->capacity) == (wIdx&que->capacity))return qData[0]*(que->capacity+1);
+	else return (wIdx - rIdx)&que->capacity;
 cque_failed:
 	return 0;
 }

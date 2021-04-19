@@ -23,8 +23,8 @@ typedef struct _MapHead{
 	size_t dataSize;
 	size_t mapSize;
 	void* headID;
-	skiIndex_t minKey;
-	skiIndex_t maxKey;
+	//skiIndex_t minKey;
+	//skiIndex_t maxKey;
 }MapHead_t;
 
 #define MAPNODE_RED		(0)
@@ -127,8 +127,6 @@ skiHandler_t skiMap_create(size_t dataSize)
 	memset(pMapHead, 0, sizeof(MapHead_t));
 	pMapHead->dataSize = dataSize;
 	pMapHead->headID = &skiMapID;
-	pMapHead->maxKey = 0;
-	pMapHead->minKey = -1;
 
 	return pMapHead;
 map_failed:
@@ -264,8 +262,8 @@ size_t skiMap_push(skiHandler_t handler, skiIndex_t key, void* value)
 		insResult = NULL;
 	}else{
 		_insert_adjust(pMapHead, (void*)pMapNode);
-		pMapHead->minKey = __getMinKey(key, pMapHead->minKey);
-		pMapHead->maxKey = __getMaxKey(key, pMapHead->maxKey);
+		//pMapHead->minKey = __getMinKey(key, pMapHead->minKey);
+		//pMapHead->maxKey = __getMaxKey(key, pMapHead->maxKey);
 		pMapHead->mapSize++;
 	}
 
@@ -450,6 +448,7 @@ static void _delete_deal(MapHead_t* pHead, StalkNode_t* node)
 	__removeNode(node, child);
 }
 
+# if 0 //unused but mark here
 static skiIndex_t _prev_index(StalkNode_t* node)
 {
 	if(node->left){
@@ -479,6 +478,7 @@ static skiIndex_t _next_index(StalkNode_t* node)
 
 	return ((MapNode_t*)node)->key;
 }
+#endif
 
 size_t skiMap_pop(skiHandler_t handler, skiIndex_t key, void* value)
 {
@@ -488,8 +488,8 @@ size_t skiMap_pop(skiHandler_t handler, skiIndex_t key, void* value)
 	MapNode_t* node = (MapNode_t*)_search_find(pMapHead, key);
 	if(node == NULL)goto map_failed;
 
-	if(pMapHead->maxKey == node->key) pMapHead->maxKey = _prev_index((StalkNode_t*)node);
-	if(pMapHead->minKey == node->key) pMapHead->minKey = _next_index((StalkNode_t*)node);
+	//if(pMapHead->maxKey == node->key) pMapHead->maxKey = _prev_index((StalkNode_t*)node);
+	//if(pMapHead->minKey == node->key) pMapHead->minKey = _next_index((StalkNode_t*)node);
 
 	_delete_aim(pMapHead, (StalkNode_t*)node);
 	_delete_adjust(pMapHead, (StalkNode_t*)node);
@@ -516,11 +516,13 @@ map_failed:
 	return NULL;
 }
 
-static void _foreach_deal(StalkNode_t* root, skiFunc3_t func3, void* arg)
+static int _foreach_deal(StalkNode_t* root, skiFunc3_t func3, void* arg)
 {
-	if(root->left)_foreach_deal(root->left, func3, arg);
-	func3(((MapNode_t*)root)->key, ((MapNode_t*)root)->value, arg);
-	if(root->right)_foreach_deal(root->right, func3, arg);
+	int ret = 0;
+	if(root->left)ret = _foreach_deal(root->left, func3, arg);
+	if(ret)ret = func3(((MapNode_t*)root)->key, ((MapNode_t*)root)->value, arg);
+	if(ret && root->right)ret = _foreach_deal(root->right, func3, arg);
+	return ret;
 }
 
 void skiMap_foreach(skiHandler_t handler, skiFunc3_t func3, void* arg)
@@ -528,7 +530,7 @@ void skiMap_foreach(skiHandler_t handler, skiFunc3_t func3, void* arg)
 	if(!__identifyHead(handler) || !func3 || !((MapHead_t*)handler)->root)
 		goto map_failed;
 
-	_foreach_deal(((MapHead_t*)handler)->root, func3, arg);
+	(void)_foreach_deal(((MapHead_t*)handler)->root, func3, arg);
 
 map_failed:
 	return;
@@ -571,6 +573,7 @@ map_failed:
 	return 0;
 }
 
+#if 0	//abandon
 skiIndex_t skiMap_min(skiHandler_t handler)
 {
 	if(!__identifyHead(handler))goto map_failed;
@@ -586,6 +589,7 @@ skiIndex_t skiMap_max(skiHandler_t handler)
 map_failed:
 	return 0;
 }
+#endif
 
 #if 0	//debug
 void printRBTree4dbg(skiHandler_t handler)

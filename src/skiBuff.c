@@ -92,7 +92,7 @@ static size_t _recap_bufvct(BufVector_t* pBufVct, size_t reqSize)
 	return newCap;
 }
 
-size_t skiBuffer_reSize(skiHandler_t handler, size_t size)
+size_t skiBuffer_resize(skiHandler_t handler, size_t size)
 {
 	if(!__identifyHead(handler))goto buf_failed;
 	BufVector_t* pBufVct = handler;
@@ -128,7 +128,7 @@ buf_failed:
 	return 0;
 }
 
-size_t skiBuffer_depend(skiHandler_t handler, void* buf, size_t length)
+size_t skiBuffer_append(skiHandler_t handler, void* buf, size_t length)
 {
 	if(!__identifyHead(handler) || !buf)goto buf_failed;
 	BufVector_t* pBufVct = handler;
