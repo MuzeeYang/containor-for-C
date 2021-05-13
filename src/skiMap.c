@@ -516,24 +516,25 @@ map_failed:
 	return NULL;
 }
 
-static int _foreach_deal(StalkNode_t* root, skiFunc3_t func3, void* arg)
+static int _foreach_deal(StalkNode_t* root, skiFuncIPP_t funcIPP, void* arg)
 {
-	int ret = 0;
-	if(root->left)ret = _foreach_deal(root->left, func3, arg);
-	if(ret)ret = func3(((MapNode_t*)root)->key, ((MapNode_t*)root)->value, arg);
-	if(ret && root->right)ret = _foreach_deal(root->right, func3, arg);
-	return ret;
+	if(root->left)_foreach_deal(root->left, funcIPP, arg);
+	if(funcIPP(((MapNode_t*)root)->key, ((MapNode_t*)root)->value, arg))goto map_out;
+	if(root->right)_foreach_deal(root->right, funcIPP, arg);
+map_out:
+	return 0;
 }
 
-void skiMap_foreach(skiHandler_t handler, skiFunc3_t func3, void* arg)
+int skiMap_foreach(skiHandler_t handler, skiFuncIPP_t funcIPP, void* arg)
 {
-	if(!__identifyHead(handler) || !func3 || !((MapHead_t*)handler)->root)
+	if(!__identifyHead(handler) || !funcIPP || !((MapHead_t*)handler)->root)
 		goto map_failed;
 
-	(void)_foreach_deal(((MapHead_t*)handler)->root, func3, arg);
+	(void)_foreach_deal(((MapHead_t*)handler)->root, funcIPP, arg);
 
+	return funcIPP(0, NULL, arg);
 map_failed:
-	return;
+	return 0;
 }
 
 static void _clear_deal(StalkNode_t* root)
@@ -573,23 +574,35 @@ map_failed:
 	return 0;
 }
 
-#if 0	//abandon
-skiIndex_t skiMap_min(skiHandler_t handler)
+void* skiMap_min(skiHandler_t handler, skiIndex_t* outIdx)
 {
 	if(!__identifyHead(handler))goto map_failed;
-	return ((MapHead_t*)handler)->minKey;
+	MapHead_t* pMapHead = handler;
+	StalkNode_t* cursor = pMapHead->root;
+	if(cursor == NULL)goto map_failed;
+	while(cursor->left)cursor = cursor->left;
+
+	MapNode_t* pMapNode = (MapNode_t*)cursor;
+	if(outIdx)*outIdx = pMapNode->key;
+	return pMapNode->value;
 map_failed:
-	return 0;
+	return NULL;
 }
 
-skiIndex_t skiMap_max(skiHandler_t handler)
+void* skiMap_max(skiHandler_t handler, skiIndex_t* outIdx)
 {
 	if(!__identifyHead(handler))goto map_failed;
-	return ((MapHead_t*)handler)->maxKey;
+	MapHead_t* pMapHead = handler;
+	StalkNode_t* cursor = pMapHead->root;
+	if(cursor == NULL)goto map_failed;
+	while(cursor->right)cursor = cursor->right;
+
+	MapNode_t* pMapNode = (MapNode_t*)cursor;
+	if(outIdx)*outIdx = pMapNode->key;
+	return pMapNode->value;
 map_failed:
-	return 0;
+	return NULL;
 }
-#endif
 
 #if 0	//debug
 void printRBTree4dbg(skiHandler_t handler)

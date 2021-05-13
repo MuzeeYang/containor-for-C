@@ -5,7 +5,7 @@
 #include "pthread.h"
 #include "unistd.h"
 
-#define TEST_SIZE (11)
+#define TEST_SIZE (10)
 #define swap_val(_v1, _v2)	do{if((_v1) == (_v2))break; (_v1) ^= (_v2); (_v2) ^= (_v1); (_v1) ^= (_v2);}while(0)
 int printNode(void* data, void* out)
 {
@@ -35,6 +35,7 @@ void sort_test()
 	for(int i = 0; i < TEST_SIZE; i++){
 		tmp = rand() % (TEST_SIZE * 10);
 		skiList_pushBack(hd, &tmp);
+		//skiList_arrange(hd, &tmp, cmpFunc);
 	}
 	skiHandler_t cp = skiList_copy(hd);
 	printf("data ready.\n");
@@ -43,7 +44,7 @@ void sort_test()
 
 
 	cmpCallCnt = 0;
-	printf("insert sort start =====================\n");
+	printf("st1 sort start =====================\n");
 	gettimeofday(&tm, NULL);
 	start = tm.tv_sec * 1000000 + tm.tv_usec ;// 1000;
 	skiList_sort(hd, cmpFunc);
@@ -54,7 +55,7 @@ void sort_test()
 	putchar(10);
 
 	cmpCallCnt = 0;
-	printf("merge sort start =====================\n");
+	printf("st2 sort start =====================\n");
 	gettimeofday(&tm, NULL);
 	start = tm.tv_sec * 1000000 + tm.tv_usec ;// 1000;
 	skiList_sort(cp, cmpFunc);
@@ -126,9 +127,6 @@ void list_test()
 	skiList_foreach(hdlr, printNode, NULL);
 	putchar(10);
 
-	skiList_reCap(hdlr, skiList_size(hdlr));
-	printf("recapacity list[%p] to size.\n", hdlr);
-
 	a = 123;
 	skiList_pushBack(hdlr, &a);
 	printf("push %d into list[%p]\n", a, hdlr);
@@ -190,7 +188,7 @@ void test_map()
 	printf("}");
 	putchar(10);
 
-	printf("min = %lu, size = %lu, max = %lu: \n", skiMap_min(hd), skiMap_size(hd), skiMap_max(hd));
+	//printf("min = %lu, size = %lu, max = %lu: \n", skiMap_min(hd), skiMap_size(hd), skiMap_max(hd));
 	skiMap_foreach(hd, printMapNode, NULL);
 	putchar(10);
 
@@ -219,7 +217,7 @@ void test_map()
 		skiMap_pop(hd, key[i], &value);
 		printf("deleted [%d: %d] ==> ", key[i], value);
 
-		printf("min = %lu, size = %lu, max = %lu: \n", skiMap_min(hd), skiMap_size(hd), skiMap_max(hd));
+		//printf("min = %lu, size = %lu, max = %lu: \n", skiMap_min(hd), skiMap_size(hd), skiMap_max(hd));
 		skiMap_foreach(hd, printMapNode, NULL);
 		putchar(10);
 	}
@@ -307,7 +305,7 @@ void buf_test()
 
 	//printf(skiBuffer_at(hdr, 0));
 
-	skiBuffer_depend(hdr, "Hello Buffer.\n", 14);
+	skiBuffer_append(hdr, "Hello Buffer.\n", 14);
 	//printf(skiBuffer_at(hdr, 0));
 	skiBuffer_truncate(hdr, NULL, 8);
 	printf("==============\n");
@@ -342,11 +340,61 @@ void buf_test()
 
 
 	printf("==============\n");
-	skiBuffer_reSize(copy, 5);
+	skiBuffer_resize(copy, 5);
 	puts(skiBuffer_at(copy, 0));
 	skiBuffer_destroy(copy);
 }
 
+
+static int everyNode(char* key, void* data, void* arg)
+{
+	if(data)
+		printf("key = %s: value = %d\n", key, *(int*)data);
+	return 0;
+}
+
+static int clearNode(void* key, void* value)
+{
+	return (*(int*)value) > 3;
+}
+
+void hashMap_test()
+{
+	int i;
+	skiHandler_t hd = skiHashMap_create(sizeof(int), 0);
+
+	char* keys[] = {
+		"fjdksal",
+		"t82o rgja",
+		"abcdefg",
+		"123456",
+		"/ 9,0;ikm. rte4r5td3w srdg",
+		"t271	 GV/P;ZCX,.",
+		"2805r fjdwsklfsaxvf",
+		"8`1905 8itojgksdal'L;",
+	};
+
+	for(i = 0; i < sizeof(keys)/sizeof(char*); i++){
+		skiHashMap_push(hd, keys[i], &i);
+	}
+
+	printf("hashmap size = %d\n", skiHashMap_size(hd));
+	skiHashMap_foreach(hd, everyNode, NULL);
+	*(int*)skiHashMap_at(hd, "123456") = 123;
+
+
+	skiHashMap_pop(hd, "123456", &i);
+	printf("popped value: %d\n", i);
+
+	printf("============\n");
+	skiHashMap_foreach(hd, everyNode, NULL);
+
+	skiHashMap_clear(hd, clearNode);
+	printf("============\n");
+	skiHashMap_foreach(hd, everyNode, NULL);
+
+	skiHashMap_destroy(hd);
+}
 
 int main()
 {
@@ -354,10 +402,9 @@ int main()
 	//sort_test();
 	//test_map();
 	//que_test();
-
 	//que_test01();
-
-	buf_test();
+	//buf_test();
+	hashMap_test();
 
 	return 0;
 }

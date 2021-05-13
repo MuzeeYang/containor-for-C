@@ -10,7 +10,6 @@ typedef struct _pulleyNode
 
 typedef struct _listHead{
 	PulleyNode_t pulley;
-	size_t capacity;
 	size_t listSize;
 	size_t dataSize;
 	void* headID;
@@ -98,13 +97,12 @@ static int inline __is_empty(PulleyNode_t* head)
 	return head->next == head;
 }
 
-skiHandler_t skiList_create(size_t dataSize, size_t capacity)
+skiHandler_t skiList_create(size_t dataSize)
 {
 	ListHead_t* pListHead = malloc(sizeof(ListHead_t));
 	if(pListHead == NULL)goto malloc_failed;
 
 	pListHead->dataSize = dataSize;
-	pListHead->capacity = capacity;
 	pListHead->listSize = 0;
 	pListHead->headID = &skiListID;
 	__initNode(&pListHead->pulley);
@@ -113,12 +111,10 @@ malloc_failed:
 	return pListHead;
 }
 
-size_t skiList_insert(skiHandler_t handler, skiPosition_t pos, void* data)
+skiPosition_t skiList_insert(skiHandler_t handler, skiPosition_t pos, void* data)
 {
 	if(!__identifyHead(handler))goto list_failed;
 	ListHead_t* pListHead = handler;
-
-	if(pListHead->listSize == pListHead->capacity)goto list_failed;
 
 	if(!__identifyNode(pos))pos = ((PulleyNode_t*)handler)->next;
 	PulleyNode_t* pEntry = pos;
@@ -130,13 +126,14 @@ size_t skiList_insert(skiHandler_t handler, skiPosition_t pos, void* data)
 
 	if(data)memcpy(pListNode->data, data, pListHead->dataSize);
 	//pListNode->nodeID = handler;
+	pListHead->listSize++;
 
-	return pListHead->listSize += 1;
+	return (skiPosition_t)pListNode;
 list_failed:
-	return 0;
+	return NULL;
 }
 
-size_t skiList_delete(skiHandler_t handler, skiPosition_t pos, void* data)
+skiPosition_t skiList_delete(skiHandler_t handler, skiPosition_t pos, void* data)
 {
 	if(!__identifyHead(handler))goto list_failed;
 	if(!__identifyNode(pos))goto list_failed;
@@ -154,33 +151,34 @@ size_t skiList_delete(skiHandler_t handler, skiPosition_t pos, void* data)
 	if(data)memcpy(data, pListNode->data, pListHead->dataSize);
 	//pListNode->nodeID = NULL;
 	free(pNode);
-	return pListHead->listSize--;
+	pListHead->listSize--;
 
+	return (skiPosition_t)pos;
 list_failed:
-	return 0;
+	return NULL;
 }
 
-size_t skiList_pushBack(skiHandler_t handler, void* data)
+skiPosition_t skiList_pushBack(skiHandler_t handler, void* data)
 {
-	if(!__identifyHead(handler))return 0;
+	if(!__identifyHead(handler))return NULL;
 	return skiList_insert(handler, ((PulleyNode_t*)handler), data);
 }
 
-size_t skiList_pushFront(skiHandler_t handler, void* data)
+skiPosition_t skiList_pushFront(skiHandler_t handler, void* data)
 {
-	if(!__identifyHead(handler))return 0;
+	if(!__identifyHead(handler))return NULL;
 	return skiList_insert(handler, ((PulleyNode_t*)handler)->next, data);
 }
 
-size_t skiList_popBack(skiHandler_t handler, void* data)
+skiPosition_t skiList_popBack(skiHandler_t handler, void* data)
 {
-	if(!__identifyHead(handler))return 0;
+	if(!__identifyHead(handler))return NULL;
 	return skiList_delete(handler, ((PulleyNode_t*)handler)->prev, data);
 }
 
-size_t skiList_popFront(skiHandler_t handler, void* data)
+skiPosition_t skiList_popFront(skiHandler_t handler, void* data)
 {
-	if(!__identifyHead(handler))return 0;
+	if(!__identifyHead(handler))return NULL;
 	return skiList_delete(handler, ((PulleyNode_t*)handler)->next, data);
 }
 
@@ -208,7 +206,7 @@ int skiList_foreach(skiHandler_t handler, skiFunc2_t func2, void* arg)
 	PulleyNode_t* pHead = handler, *cursor = NULL;
 
 	for(cursor = pHead->next; cursor != pHead; cursor = cursor->next){
-		if(0 == func2(((ListNode_t*)cursor)->data, arg))break;
+		if(func2(((ListNode_t*)cursor)->data, arg))break;
 	}
 
 	return func2(NULL, arg);
@@ -216,19 +214,24 @@ list_failed:
 	return 0;
 }
 
-void skiList_clear(skiHandler_t handler)
+void skiList_clear(skiHandler_t handler, skiFunc1_t clearFunc)
 {
 	if(!__identifyHead(handler))return;
 	ListHead_t* pListHead = handler;
 	PulleyNode_t* pHead = handler;
 	ListNode_t* pListNode = NULL;
 
-	while(pHead->next != pHead){
-		pListNode = (ListNode_t*)pHead->next;
-		__deleteNode(pListNode->pulley.prev, pListNode->pulley.next);
-		__initNode(&pListNode->pulley);
-		//pListNode->nodeID = NULL;
-		free(pListNode);
+	//while(pHead->next != pHead){
+	for(PulleyNode_t* cursor = pHead; cursor->next != pHead;){
+		pListNode = (ListNode_t*)cursor->next;
+		if(clearFunc && clearFunc(pListNode->data)){
+			cursor = (PulleyNode_t*)pListNode;
+		}else{
+			__deleteNode(pListNode->pulley.prev, pListNode->pulley.next);
+			__initNode(&pListNode->pulley);
+			//pListNode->nodeID = NULL;
+			free(pListNode);
+		}
 	}
 	pListNode = NULL;
 
@@ -240,7 +243,7 @@ void skiList_destroy(skiHandler_t handler)
 	if(!__identifyHead(handler))return;
 	ListHead_t* pListHead = handler;
 
-	skiList_clear(handler);
+	skiList_clear(handler, NULL);
 	pListHead->headID = NULL;
 	free(handler);
 }
@@ -286,16 +289,6 @@ size_t skiList_size(skiHandler_t handler)
 	return ((ListHead_t*)handler)->listSize;
 }
 
-void skiList_reCap(skiHandler_t handler, size_t capacity)
-{
-	if(!__identifyHead(handler))return;
-	ListHead_t* pListHead = handler;
-
-	if(pListHead->listSize > capacity)return;
-
-	pListHead->capacity = capacity;
-}
-
 static int __copy_node(void* data, void* handler)
 {
 	if(data)skiList_pushBack(handler, data);
@@ -307,7 +300,7 @@ skiHandler_t skiList_copy(skiHandler_t handler)
 	if(!__identifyHead(handler))goto list_failed;
 	ListHead_t* pListHead = handler;
 
-	ListHead_t* pListHeadNew = skiList_create(pListHead->dataSize, pListHead->capacity);
+	ListHead_t* pListHeadNew = skiList_create(pListHead->dataSize);
 	if(pListHeadNew == NULL)goto list_failed;
 
 	skiList_foreach(pListHead, __copy_node, pListHeadNew);
@@ -332,7 +325,6 @@ size_t skiList_join(skiHandler_t handler1, skiHandler_t handler2)
 	__initNode(pHead2);
 
 	pListHead1->listSize += pListHead2->listSize;
-	if(pListHead1->capacity < pListHead1->listSize)pListHead1->capacity = pListHead1->listSize;
 
 	skiList_destroy(handler2);
 
@@ -355,7 +347,7 @@ skiHandler_t skiList_cut(skiHandler_t handler, skiPosition_t pos, size_t length)
 		cursor = cursor->next;
 	}
 
-	ListHead_t* pListHeadNew = skiList_create(pListHead->dataSize, pListHead->capacity);
+	ListHead_t* pListHeadNew = skiList_create(pListHead->dataSize);
 	if(pListHeadNew == NULL)goto list_failed;
 
 	__deleteNode(start->prev, cursor->next);
@@ -455,10 +447,15 @@ static void __merge_sort(PulleyNode_t* pHead, size_t size, skiFunc2_t cmpFunc)
 }
 
 #if 0	//for test sort
-void skiList_sort_st(skiHandler_t handler, skiFunc2_t cmpFunc)
+void skiList_sort_st1(skiHandler_t handler, skiFunc2_t cmpFunc)
 {
 	if(!__identifyHead(handler) || cmpFunc == NULL)return;
 	__insert_sort(handler, cmpFunc);
+}
+void skiList_sort_st2(skiHandler_t handler, skiFunc2_t cmpFunc)
+{
+	if(!__identifyHead(handler) || cmpFunc == NULL)return;
+	__tim_sort(handler, cmpFunc);
 }
 #endif
 
@@ -468,6 +465,23 @@ void skiList_sort(skiHandler_t handler, skiFunc2_t cmpFunc)
 	//__quick_sort(((PulleyNode_t*)handler)->next, ((PulleyNode_t*)handler), cmpFunc);
 	__merge_sort(handler, ((ListHead_t*)handler)->listSize, cmpFunc);
 }
+
+skiPosition_t skiList_arrange(skiHandler_t handler, void* data, skiFunc2_t cmpFunc)
+{
+	if(!__identifyHead(handler) || !data)goto list_failed;
+	ListHead_t* pListHead = handler;
+	PulleyNode_t* pHead = &pListHead->pulley;
+	PulleyNode_t* cursor = NULL;
+
+	for(cursor = pHead->next; cursor != pHead; cursor = cursor->next){
+		if(cmpFunc(data, ((ListNode_t*)cursor)->data) < 0)break;
+	}
+
+	return skiList_insert(handler, cursor, data);
+list_failed:
+	return NULL;
+}
+
 
 void skiList_reverse(skiHandler_t handler)
 {
