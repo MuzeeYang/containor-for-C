@@ -2,10 +2,14 @@
 
 static char skiHashMapID;
 
+typedef struct _hashMapPulley{
+	struct _hashMapPulley* next;
+}HashMapPulley_t;
+
 typedef struct _HashMapNode{
+	HashMapPulley_t pulley;
 	skiHashCode_t hashCode;
 	size_t valueOffset;
-	struct _HashMapNode* next;
 	char key[0];
 }HashMapNode_t;
 
@@ -14,7 +18,7 @@ typedef struct _HashMapHead{
 	size_t dataSize;
 	int capIdx;
 	void* headID;
-	HashMapNode_t** array;
+	HashMapPulley_t* array;
 }HashMapHead_t;
 
 #define memset __builtin_memset
@@ -92,12 +96,12 @@ skiHandler_t skiHashMap_create(size_t dataSize, size_t capacity)
 	memset(pMapHead, 0, sizeof(HashMapHead_t));
 
 	pMapHead->capIdx = _get_new_cap_idx(capacity);
-	pMapHead->array = malloc(sizeof(HashMapNode_t*)*hashCap[pMapHead->capIdx]);
+	pMapHead->array = malloc(sizeof(HashMapPulley_t)*hashCap[pMapHead->capIdx]);
 	if(pMapHead->array == NULL){
 		free(pMapHead);
 		goto hash_failed;
 	}
-	memset(pMapHead->array, 0, sizeof(HashMapNode_t*)*hashCap[pMapHead->capIdx]);
+	memset(pMapHead->array, 0, sizeof(HashMapPulley_t)*hashCap[pMapHead->capIdx]);
 
 	pMapHead->dataSize = dataSize;
 	pMapHead->headID = &skiHashMapID;
@@ -110,18 +114,21 @@ hash_failed:
 static void _cap_increase(HashMapHead_t* pMapHead)
 {
 	if(pMapHead->capIdx == CAP_TABLE_LENGTH)return;
-	HashMapNode_t** array = malloc(sizeof(HashMapNode_t*)*hashCap[pMapHead->capIdx+1]);
+	HashMapPulley_t* array = malloc(sizeof(HashMapPulley_t)*hashCap[pMapHead->capIdx+1]);
 	if(array == NULL)return;
 
-	memset(array, 0, sizeof(HashMapNode_t*)*hashCap[pMapHead->capIdx+1]);
-	HashMapNode_t* cursor = NULL;
+	memset(array, 0, sizeof(HashMapPulley_t)*hashCap[pMapHead->capIdx+1]);
+	HashMapPulley_t* pHead = NULL;
+	HashMapNode_t* target = NULL;
 	int arrIdx = 0;
 	for(int i = 0; i < hashCap[pMapHead->capIdx]; i++){
-		while((cursor = pMapHead->array[i])){
-			pMapHead->array[i] = cursor->next;
-			arrIdx = cursor->hashCode % hashCap[pMapHead->capIdx+1];
-			cursor->next = array[arrIdx];
-			array[arrIdx] = cursor;
+		pHead = pMapHead->array + i;
+		while(pHead->next){
+			target = (HashMapNode_t*)pHead->next;
+			arrIdx = target->hashCode % hashCap[pMapHead->capIdx+1];
+			pHead->next = target->pulley.next;
+			target->pulley.next = array[arrIdx].next;
+			array[arrIdx].next = (HashMapPulley_t*)target;
 		}
 	}
 
@@ -142,11 +149,13 @@ size_t skiHashMap_push(skiHandler_t handler, char* key, void* value)
 	size_t keyLength = _bkdrHash(key, &hashCode);
 	int arrIdx = hashCode % hashCap[pMapHead->capIdx];
 
-	HashMapNode_t* cursor = NULL;
-	for(cursor = pMapHead->array[arrIdx]; cursor != NULL; cursor = cursor->next){
-		if(cursor->hashCode == hashCode
-		&& cursor->valueOffset == keyLength
-		&& 0 == memcmp(cursor->key, key, keyLength))
+	HashMapPulley_t* cursor = pMapHead->array + arrIdx;
+	HashMapNode_t* target = NULL;
+	for(; cursor->next != NULL; cursor = cursor->next){
+		target = (HashMapNode_t*)cursor->next;
+		if(target->hashCode == hashCode
+		&& target->valueOffset == keyLength
+		&& 0 == memcmp(target->key, key, keyLength))
 			goto hash_failed;
 	}
 
@@ -159,8 +168,7 @@ size_t skiHashMap_push(skiHandler_t handler, char* key, void* value)
 	pMapNode->hashCode = hashCode;
 	pMapNode->valueOffset = keyLength;
 
-	pMapNode->next = pMapHead->array[arrIdx];
-	pMapHead->array[arrIdx] = pMapNode;
+	cursor->next = (HashMapPulley_t*)pMapNode;
 
 	return ++(pMapHead->mapSize);
 hash_failed:
@@ -176,37 +184,21 @@ size_t skiHashMap_pop(skiHandler_t handler, char* key, void* value)
 	size_t keyLength = _bkdrHash(key, &hashCode);
 	int arrIdx = hashCode % hashCap[pMapHead->capIdx];
 
-	HashMapNode_t* cursor = pMapHead->array[arrIdx];
+	HashMapPulley_t* cursor = pMapHead->array + arrIdx;
 	HashMapNode_t* target = NULL;
-	if(cursor == NULL)goto hash_failed;
-
-	if(cursor->next == NULL){
-		target = cursor;
+	for(; cursor->next != NULL; cursor = cursor->next){
+		target = (HashMapNode_t*)cursor->next;
 		if(target->hashCode == hashCode
 		&& target->valueOffset == keyLength
 		&& 0 == memcmp(target->key, key, keyLength)){
-			pMapHead->array[arrIdx] = NULL;
-			target->next = NULL;
-			goto hash_out;
+			cursor->next = target->pulley.next;
+			target->pulley.next = NULL;
+			if(value)memcpy(value, target->key + target->valueOffset, pMapHead->dataSize);
+			free(target);
+			return pMapHead->mapSize--;
 		}
 	}
 
-	for(; cursor->next != NULL; cursor = cursor->next, target = NULL){
-		target = cursor->next;
-		if(target->hashCode == hashCode
-		&& target->valueOffset == keyLength
-		&& 0 == memcmp(target->key, key, keyLength)){
-			cursor->next = target->next;
-			target->next = NULL;
-			break;
-		}
-	}
-	if(target == NULL)goto hash_failed;
-
-hash_out:
-	if(value)memcpy(value, target->key + target->valueOffset, pMapHead->dataSize);
-	free(target);
-	return pMapHead->mapSize--;
 hash_failed:
 	return 0;
 }
@@ -220,18 +212,16 @@ void* skiHashMap_at(skiHandler_t handler, char* key)
 	size_t keyLength = _bkdrHash(key, &hashCode);
 	int arrIdx = hashCode % hashCap[pMapHead->capIdx];
 
-	HashMapNode_t* cursor = pMapHead->array[arrIdx];
-	if(cursor && cursor->next == NULL)goto hash_out;
-
-	for(; cursor != NULL; cursor = cursor->next){
-		if(cursor->hashCode == hashCode
-		&& cursor->valueOffset == keyLength
-		&& 0 == memcmp(cursor->key, key, keyLength))
-			goto hash_out;
+	HashMapPulley_t* cursor = pMapHead->array + arrIdx;
+	HashMapNode_t* target = NULL;
+	for(; cursor->next != NULL; cursor = cursor->next){
+		target = (HashMapNode_t*)cursor->next;
+		if(target->hashCode == hashCode
+		&& target->valueOffset == keyLength
+		&& 0 == memcmp(target->key, key, keyLength))
+			return target->key + target->valueOffset;
 	}
 
-hash_out:
-	return cursor->key + cursor->valueOffset;
 hash_failed:
 	return NULL;
 }
@@ -241,14 +231,16 @@ int skiHashMap_foreach(skiHandler_t handler, skiFunc3_t func3, void* arg)
 	if(!__identifyHead(handler))goto hash_failed;
 	HashMapHead_t* pMapHead = handler;
 
-	HashMapNode_t* cursor = NULL;
+	HashMapPulley_t* cursor = NULL;
+	HashMapNode_t* target = NULL;
 	for(int i = 0; i < hashCap[pMapHead->capIdx]; i++){
-		for(cursor = pMapHead->array[i]; cursor != NULL; cursor = cursor->next)
-			if(func3(cursor->key, cursor->key+cursor->valueOffset, arg))
-				goto hash_out;
+		for(cursor = pMapHead->array + i; cursor->next != NULL; cursor = cursor->next){
+			target = (HashMapNode_t*)cursor->next;
+			if(func3(target->key, target->key + target->valueOffset, arg))
+				return func3("", NULL, arg);
+		}
 	}
 
-hash_out:
 	return func3("", NULL, arg);
 hash_failed:
 	return 0;
@@ -269,26 +261,16 @@ void skiHashMap_clear(skiHandler_t handler, skiFunc2_t clearFunc)
 	if(!__identifyHead(handler))goto hash_failed;
 	HashMapHead_t* pMapHead = handler;
 
-	HashMapNode_t* cursor = NULL;
+	HashMapPulley_t* cursor = NULL;
 	HashMapNode_t* target = NULL;
 	for(int i = 0; i < hashCap[pMapHead->capIdx]; i++){
-		if(pMapHead->array[i] == NULL)continue;
-		cursor = pMapHead->array[i];
-		while(!clearFunc || !clearFunc(cursor->key, cursor->key+cursor->valueOffset)){
-			pMapHead->array[i] = cursor->next;
-			//cursor->next = NULL;
-			free(cursor);
-			if(pMapHead->array[i])cursor = pMapHead->array[i];
-			else break;
-		}
-		if(pMapHead->array[i] == NULL)continue;
-
-		for(cursor = pMapHead->array[i]; cursor->next != NULL;){
-			target = cursor->next;
-			if(clearFunc && clearFunc(target->key, target->key+target->valueOffset)){
-				cursor = target;
-			}else{
-				cursor->next = target->next;
+		for(cursor = pMapHead->array + i; cursor->next != NULL;){
+			target = (HashMapNode_t*)cursor->next;
+			if(clearFunc && clearFunc(target->key, target->key + target->valueOffset))
+				cursor = cursor->next;
+			else{
+				cursor->next = target->pulley.next;
+				target->pulley.next = NULL;
 				free(target);
 			}
 		}
