@@ -1,5 +1,4 @@
 #include "skiContainor.h"
-#include "sched.h"
 
 static char skiQueID;
 
@@ -123,23 +122,25 @@ cque_failed:
 }
 
 
-size_t skiQue_poll(skiHandler_t handler, char rw)
+size_t skiQue_poll(skiHandler_t handler, char rw, skiFunc2_t pauseFunc, void* arg)
 {
 	if(!__identifyHead(handler))goto cque_failed;
 	CclQue_t* que = handler;
 	skiIndex_t rIdx = que->rIdx;
 	skiIndex_t wIdx = que->wIdx; 
 	char* qData = que->data + (rIdx&que->capacity) * (que->dataSize+1);
+	size_t pauseCnt = 0;
 
 	while((rIdx&que->capacity) == (wIdx&que->capacity) && qData[0] == rw){
-		sched_yield();
+		//sched_yield();
+		++pauseCnt;
+		if(pauseFunc)pauseFunc(&pauseCnt, arg);
 		rIdx = que->rIdx;
 		wIdx = que->wIdx; 
 		qData = que->data + (rIdx&que->capacity) * (que->dataSize+1);
 	}
 
-	if((rIdx&que->capacity) == (wIdx&que->capacity))return qData[0]*(que->capacity+1);
-	else return (wIdx - rIdx)&que->capacity;
+	return (wIdx - rIdx)&que->capacity;
 cque_failed:
 	return 0;
 }

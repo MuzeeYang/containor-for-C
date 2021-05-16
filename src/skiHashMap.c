@@ -9,7 +9,7 @@ typedef struct _hashMapPulley{
 typedef struct _HashMapNode{
 	HashMapPulley_t pulley;
 	skiHashCode_t hashCode;
-	size_t valueOffset;
+	void* value;
 	char key[0];
 }HashMapNode_t;
 
@@ -153,9 +153,7 @@ size_t skiHashMap_push(skiHandler_t handler, char* key, void* value)
 	HashMapNode_t* target = NULL;
 	for(; cursor->next != NULL; cursor = cursor->next){
 		target = (HashMapNode_t*)cursor->next;
-		if(target->hashCode == hashCode
-		&& target->valueOffset == keyLength
-		&& 0 == memcmp(target->key, key, keyLength))
+		if(target->hashCode == hashCode && 0 == memcmp(target->key, key, keyLength))
 			goto hash_failed;
 	}
 
@@ -166,7 +164,7 @@ size_t skiHashMap_push(skiHandler_t handler, char* key, void* value)
 	memcpy(pMapNode->key, key, keyLength);
 	memcpy(pMapNode->key + keyLength, value, pMapHead->dataSize);
 	pMapNode->hashCode = hashCode;
-	pMapNode->valueOffset = keyLength;
+	pMapNode->value = pMapNode->key + keyLength;
 
 	cursor->next = (HashMapPulley_t*)pMapNode;
 
@@ -188,12 +186,10 @@ size_t skiHashMap_pop(skiHandler_t handler, char* key, void* value)
 	HashMapNode_t* target = NULL;
 	for(; cursor->next != NULL; cursor = cursor->next){
 		target = (HashMapNode_t*)cursor->next;
-		if(target->hashCode == hashCode
-		&& target->valueOffset == keyLength
-		&& 0 == memcmp(target->key, key, keyLength)){
+		if(target->hashCode == hashCode && 0 == memcmp(target->key, key, keyLength)){
 			cursor->next = target->pulley.next;
 			target->pulley.next = NULL;
-			if(value)memcpy(value, target->key + target->valueOffset, pMapHead->dataSize);
+			if(value)memcpy(value, target->value, pMapHead->dataSize);
 			free(target);
 			return pMapHead->mapSize--;
 		}
@@ -216,10 +212,8 @@ void* skiHashMap_at(skiHandler_t handler, char* key)
 	HashMapNode_t* target = NULL;
 	for(; cursor->next != NULL; cursor = cursor->next){
 		target = (HashMapNode_t*)cursor->next;
-		if(target->hashCode == hashCode
-		&& target->valueOffset == keyLength
-		&& 0 == memcmp(target->key, key, keyLength))
-			return target->key + target->valueOffset;
+		if(target->hashCode == hashCode && 0 == memcmp(target->key, key, keyLength))
+			return target->value;
 	}
 
 hash_failed:
@@ -236,7 +230,7 @@ int skiHashMap_foreach(skiHandler_t handler, skiFunc3_t func3, void* arg)
 	for(int i = 0; i < hashCap[pMapHead->capIdx]; i++){
 		for(cursor = pMapHead->array + i; cursor->next != NULL; cursor = cursor->next){
 			target = (HashMapNode_t*)cursor->next;
-			if(func3(target->key, target->key + target->valueOffset, arg))
+			if(func3(target->key, target->value, arg))
 				return func3("", NULL, arg);
 		}
 	}
@@ -266,7 +260,7 @@ void skiHashMap_clear(skiHandler_t handler, skiFunc2_t clearFunc)
 	for(int i = 0; i < hashCap[pMapHead->capIdx]; i++){
 		for(cursor = pMapHead->array + i; cursor->next != NULL;){
 			target = (HashMapNode_t*)cursor->next;
-			if(clearFunc && clearFunc(target->key, target->key + target->valueOffset))
+			if(clearFunc && clearFunc(target->key, target->value))
 				cursor = cursor->next;
 			else{
 				cursor->next = target->pulley.next;

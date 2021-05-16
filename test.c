@@ -245,7 +245,7 @@ void* poptest(void* hd)
 {
 	int res[TEST_SIZE] = {0};
 	int v = 0;
-	skiQue_poll(hd, 0);
+	skiQue_poll(hd, 0, NULL, NULL);
 
 	while(skiQue_pop(hd, &v)){
 		if(v < 0 || v >= TEST_SIZE){
@@ -320,18 +320,6 @@ void buf_test()
 	skiBuffer_cut(copy, 7, buf, 2);
 	puts(buf);
 	puts(skiBuffer_at(copy, 0));
-
-	printf("==============\n");
-	hdr = skiBuffer_slice(copy, 0, 10);
-	//skiBuffer_cut(copy, 0,buf, 10);
-	puts(skiBuffer_at(hdr, 0));
-	//puts(buf);
-	puts(skiBuffer_at(copy, 0));
-
-	printf("==============\n");
-	skiBuffer_join(copy, SKIBUFFER_IDX_END, hdr);
-	puts(skiBuffer_at(copy, 0));
-	//puts(skiBuffer_at(hdr, 0));
 
 
 	printf("==============\n");

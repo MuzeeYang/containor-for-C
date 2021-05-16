@@ -155,7 +155,7 @@ size_t skiBuffer_cut(skiHandler_t handler, skiIndex_t offset, void* buf, size_t 
 	size_t rest = pBufVct->size - offset - length;
 
 	if(buf)memcpy(buf, pBufVct->buf + offset, length);
-	memmove(pBufVct->buf + offset, pBufVct->buf + offset + length, rest);
+	if(rest)memmove(pBufVct->buf + offset, pBufVct->buf + offset + length, rest);
 	memset(pBufVct->buf + offset + rest, 0, length);
 	pBufVct->size -= length;
 
@@ -181,45 +181,9 @@ buf_failed:
 	return 0;
 }
 
-size_t skiBuffer_join(skiHandler_t handler1, skiIndex_t offset, skiHandler_t handler2)
-{
-	if(!__identifyHead(handler1))goto buf_failed;
-	if(!__identifyHead(handler2))goto buf_failed;
-	BufVector_t* pBufVct1 = handler1;
-	BufVector_t* pBufVct2 = handler2;
-
-	size_t size = skiBuffer_insert(pBufVct1, offset, pBufVct2->buf, pBufVct2->size);
-	if(size == 0)goto buf_failed;
-
-	skiBuffer_destroy(pBufVct2);
-	return pBufVct1->size;
-buf_failed:
-	return 0;
-}
-
-skiHandler_t skiBuffer_slice(skiHandler_t handler, skiIndex_t offset, size_t length)
-{
-	if(!__identifyHead(handler))goto buf_failed;
-	BufVector_t* pBufVct = handler;
-
-	BufVector_t* slice = skiBuffer_create(NULL, pBufVct->size);
-	if(slice == NULL)goto buf_failed;
-
-	size_t size = skiBuffer_cut(pBufVct, offset, slice->buf, length);
-	if(size == 0){
-		skiBuffer_destroy(slice);
-		goto buf_failed;
-	}
-
-	slice->size = size;
-	return slice;
-buf_failed:
-	return NULL;
-}
-
 skiIndex_t skiBuffer_find(skiHandler_t handler, skiIndex_t offset, void* buf, size_t length)
 {
-	if(!__identifyHead(handler))goto buf_failed;
+	if(!__identifyHead(handler) || !buf)goto buf_failed;
 	BufVector_t* pBufVct = handler;
 
 	while(offset + length <= pBufVct->size){
@@ -229,6 +193,38 @@ skiIndex_t skiBuffer_find(skiHandler_t handler, skiIndex_t offset, void* buf, si
 	}
 buf_failed:
 	return pBufVct->size;
+}
+
+size_t skiBuffer_replace(skiHandler_t handler, skiIndex_t offset, size_t rpLength, void* buf, size_t bufLength)
+{
+	if(!__identifyHead(handler) || !buf)goto buf_failed;
+	BufVector_t* pBufVct = handler;
+	size_t length, rest;
+
+	if(offset > pBufVct->size)offset = pBufVct->size;
+	if(rpLength > pBufVct->size - offset)rpLength = pBufVct->size - offset;
+	rest = pBufVct->size - offset - rpLength;
+	
+	if(rpLength < bufLength){
+		length = bufLength - rpLength;
+		if(pBufVct->size + length > pBufVct->capacity){
+			if(0 == _recap_bufvct(pBufVct, pBufVct->size + length))goto buf_failed;
+		}
+
+		pBufVct->size += length;
+	}else{
+		length = rpLength - bufLength;
+
+		if(length)memset(pBufVct->buf + offset + bufLength + rest, 0, length);
+		pBufVct->size -= length;
+	}
+
+	if(rest)memmove(pBufVct->buf + offset + bufLength, pBufVct->buf + offset + rpLength, rest);
+	memcpy(pBufVct->buf + offset, buf, bufLength);
+
+	return bufLength;
+buf_failed:
+	return 0;
 }
 
 char* skiBuffer_at(skiHandler_t handler, skiIndex_t idx)
