@@ -1,4 +1,4 @@
-#include "skiContainor.h"
+#include "skiMap.h"
 
 static char skiMapID;
 
@@ -33,9 +33,6 @@ typedef struct _MapHead{
 #define MAPNODE_ROOT	(0)
 #define MAPNODE_LEFT	(1)
 #define MAPNODE_RIGHT	(2)
-
-#define memset __builtin_memset
-#define memcpy __builtin_memcpy
 
 #define __identifyHead(_pHead) ((_pHead) && ((MapHead_t*)_pHead)->headID == &skiMapID)
 #define __swap_val(_v1, _v2) do{typeof(_v1) _vt = (_v1); (_v1) = (_v2); (_v2) = _vt;}while(0)

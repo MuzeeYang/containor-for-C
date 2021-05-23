@@ -1,11 +1,15 @@
 #include "stdio.h"
-#include "skiContainor.h"
 #include "sys/time.h"
 #include "time.h"
 #include "pthread.h"
 #include "unistd.h"
+#include "skiList.h"
+#include "skiMap.h"
+#include "skiHashMap.h"
+#include "skiBuffer.h"
+#include "skiQue.h"
 
-#define TEST_SIZE (10)
+#define TEST_SIZE (12)
 #define swap_val(_v1, _v2)	do{if((_v1) == (_v2))break; (_v1) ^= (_v2); (_v2) ^= (_v1); (_v1) ^= (_v2);}while(0)
 int printNode(void* data, void* out)
 {
@@ -122,11 +126,6 @@ void list_test()
 	skiList_foreach(cp, printNode, NULL);
 	putchar(10);
 
-	skiList_join(hdlr, cp);
-	printf("join list[%p] and list[%p]\n", hdlr, cp);
-	skiList_foreach(hdlr, printNode, NULL);
-	putchar(10);
-
 	a = 123;
 	skiList_pushBack(hdlr, &a);
 	printf("push %d into list[%p]\n", a, hdlr);
@@ -136,27 +135,7 @@ void list_test()
 	skiPosition_t pos = skiList_search(hdlr, &a, cmpFunc);
 	printf("get %d's position[%p]\n", a, pos);
 
-	skiHandler_t cutdown = skiList_cut(hdlr, skiList_posNext(hdlr, pos), 5);
-	printf("list[%p] cuted into list[%p]\n", hdlr, cutdown);
-	skiList_foreach(hdlr, printNode, NULL);
-	putchar(10);
-	skiList_foreach(cutdown, printNode, NULL);
-	putchar(10);
-
-	skiList_destroy(cutdown);
-	printf("destroy list[%p] \n", cutdown);
-
-	cutdown = skiList_cut(hdlr, skiList_posPrev(hdlr, pos), 100);
-	printf("list[%p] cuted into list[%p]\n", hdlr, cutdown);
-	skiList_foreach(hdlr, printNode, NULL);
-	putchar(10);
-	skiList_foreach(cutdown, printNode, NULL);
-	putchar(10);
-
-	skiList_destroy(cutdown);
-	printf("destroy list[%p] \n", cutdown);
-
-	printf("positon's data: %d\n", *(int*)skiList_at(pos));
+	printf("positon's data: %d\n", *(int*)skiList_at(hdlr, pos));
 
 	skiList_destroy(hdlr);
 	printf("destroy list[%p] \n", hdlr);
@@ -230,13 +209,18 @@ struct _st{
 	int i;
 };
 
+int pauseFunc(void* arg)
+{
+	printf("%s waiting\n", __func__);
+	return 0;
+}
+
 void* pushtest(void* hd)
 {
 	struct _st *ptest_st = hd;
 
-	for(int i = 0; i < 100; i++){
-		usleep(1000);
-		skiQue_push(ptest_st->hd, &ptest_st->i);
+	for(int i = 0; i < 1000; i++){
+		skiQue_push(ptest_st->hd, &ptest_st->i, pauseFunc, NULL);
 	}
 	return NULL;
 }
@@ -245,14 +229,17 @@ void* poptest(void* hd)
 {
 	int res[TEST_SIZE] = {0};
 	int v = 0;
-	skiQue_poll(hd, 0, NULL, NULL);
+	size_t total = 0;
+	//skiQue_poll(hd, 0, NULL, NULL);
+	//sleep(1);
 
-	while(skiQue_pop(hd, &v)){
+	while(total < TEST_SIZE*1000){
+		skiQue_pop(hd, &v, pauseFunc, NULL);
 		if(v < 0 || v >= TEST_SIZE){
 			printf("error no. %d\n", v);
 		}else
 			res[v]++;
-		usleep(100);
+		total++;
 	}
 
 	for(int i = 0; i < TEST_SIZE; i++){
@@ -294,7 +281,7 @@ void que_test01()
 	int v = 123;
 
 	while(v--)
-		skiQue_push(hd, &v);
+		skiQue_push(hd, &v, pauseFunc, NULL);
 
 }
 
@@ -389,10 +376,10 @@ int main()
 	//list_test();
 	//sort_test();
 	//test_map();
-	//que_test();
+	que_test();
 	//que_test01();
 	//buf_test();
-	hashMap_test();
+	//hashMap_test();
 
 	return 0;
 }

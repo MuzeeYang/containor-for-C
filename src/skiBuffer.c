@@ -1,4 +1,4 @@
-#include "skiContainor.h"
+#include "skiBuffer.h"
 
 static char skiBufID;
 
@@ -9,10 +9,6 @@ typedef struct _ski_buf{
 	char* buf;
 }BufVector_t;
 
-#define memset __builtin_memset
-#define memcpy __builtin_memcpy
-#define memmove __builtin_memmove
-#define memcmp __builtin_memcmp
 
 #define __identifyHead(_pHead) ((_pHead) && ((BufVector_t*)_pHead)->headID == &skiBufID)
 

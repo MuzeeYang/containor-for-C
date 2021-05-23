@@ -1,4 +1,4 @@
-#include "skiContainor.h"
+#include "skiHashMap.h"
 
 static char skiHashMapID;
 
@@ -21,11 +21,6 @@ typedef struct _HashMapHead{
 	HashMapPulley_t* array;
 }HashMapHead_t;
 
-#define memset __builtin_memset
-#define memcpy __builtin_memcpy
-#define memmove __builtin_memmove
-#define memcmp __builtin_memcmp
-
 #define __identifyHead(_pHead) ((_pHead) && ((HashMapHead_t*)_pHead)->headID == &skiHashMapID)
 static const skiHashCode_t hashSeed[] = {
 1313131313, 131313131, 13131313, 1313131, 131313, 13131, 1313, 131, 31
@@ -41,8 +36,6 @@ static const skiHashCode_t hashCap[] = {
 
 static const int CAP_TABLE_LENGTH = sizeof(hashCap)/sizeof(skiHashCode_t);
 
-#define SKI_INT_HAS_B0(_v) (~(((((_v) & 0x7F7F7F7F) + 0x7F7F7F7F) | (_v)) | 0x7F7F7F7F))
-
 static int inline _byte_cnt_1(char c)
 {
 	int cnt = 0;
@@ -57,23 +50,6 @@ static int inline _get_new_cap_idx(size_t sz)
 		if(hashCap[i] >= sz)break;
 
 	return i;
-}
-
-size_t skiStrlen(char* str)
-{
-	skiU32_t* cur = (skiU32_t*)str;
-	size_t len = 0;
-	while(!SKI_INT_HAS_B0(*cur))cur++;
-	len = (char*)cur - str;
-
-	str = (char*)cur;
-	while(*str++)len++;
-	return len;
-}
-
-int skiStrcmp(char* str1, char* str2)
-{
-	return memcmp(str1, str2, skiStrlen(str1) + 1);
 }
 
 static size_t _bkdrHash(char *str, skiHashCode_t* out)
