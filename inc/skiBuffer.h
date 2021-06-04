@@ -116,4 +116,23 @@ char* skiBuffer_at(skiHandler_t handler, skiIndex_t idx);
  * return: size of buffer on success, 0 if error
  */
 size_t skiBuffer_size(skiHandler_t handler);
+
+/**
+ * breif: split buffer by para2
+ * Para1: handler of buffer to be operated
+ * Para2: buf to split buffer
+ * Para3: length of buf to split
+ * return: list with each sub buf splited on success, NULL if error
+ */
+skiHandler_t skiBuffer_split(skiHandler_t handler, void* buf, size_t length);
+
+/**
+ * breif: join sub buf into a new one by buffer
+ * Para1: handler of buffer to be operated
+ * Para2: list with each sub buf to join
+ * return: a new buffer joined sub buf by buffer on success, NULL if error
+ */
+skiHandler_t skiBuffer_join(skiHandler_t handler, skiHandler_t list);
+
+
 #endif

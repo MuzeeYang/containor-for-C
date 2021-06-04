@@ -115,12 +115,26 @@ void skiList_destroy(skiHandler_t handler);
 void* skiList_at(skiHandler_t handler, skiPosition_t pos);
 
 /**
+ * breif: get position of 1st node in list
+ * Para1: handler of list to be operated
+ * return: position of 1st node, NULL if error
+ */
+skiPosition_t skiList_begin(skiHandler_t handler);
+
+/**
+ * breif: get position of last node in list
+ * Para1: handler of list to be operated
+ * return: position of last node, NULL if error
+ */
+skiPosition_t skiList_end(skiHandler_t handler);
+
+/**
  * breif: get next position of this one
  * Para1: handler of list to be operated
  * Para2: position of specified node
  * return: next position of pos, NULL if pos is tail node
  */
-skiPosition_t skiList_posNext(skiHandler_t handler, skiPosition_t pos);
+skiPosition_t skiList_next(skiHandler_t handler, skiPosition_t pos);
 
 /**
  * breif: get prev position of this one
@@ -128,7 +142,7 @@ skiPosition_t skiList_posNext(skiHandler_t handler, skiPosition_t pos);
  * Para2: position of specified node
  * return: prev position of pos, NULL if pos is tail node
  */
-skiPosition_t skiList_posPrev(skiHandler_t handler, skiPosition_t pos);
+skiPosition_t skiList_prev(skiHandler_t handler, skiPosition_t pos);
 
 /**
  * breif: get size of list

@@ -113,7 +113,7 @@ skiPosition_t skiList_insert(skiHandler_t handler, skiPosition_t pos, void* data
 	if(!__identifyHead(handler))goto list_failed;
 	ListHead_t* pListHead = handler;
 
-	if(!__identifyNode(handler, pos))pos = ((PulleyNode_t*)handler)->next;
+	if(handler != pos && !__identifyNode(handler, pos))goto list_failed;
 	PulleyNode_t* pEntry = pos;
 
 	ListNode_t* pListNode = malloc(sizeof(ListNode_t) + pListHead->dataSize);
@@ -252,7 +252,31 @@ list_failed:
 	return NULL;
 }
 
-skiPosition_t skiList_posNext(skiHandler_t handler, skiPosition_t pos)
+skiPosition_t skiList_begin(skiHandler_t handler)
+{
+	if(!__identifyHead(handler))goto list_failed;
+	PulleyNode_t* pos = ((PulleyNode_t*)handler)->next;
+
+	if(pos == handler)goto list_failed;
+
+	return pos;
+list_failed:
+	return NULL;
+}
+
+skiPosition_t skiList_end(skiHandler_t handler)
+{
+	if(!__identifyHead(handler))goto list_failed;
+	PulleyNode_t* pos = ((PulleyNode_t*)handler)->prev;
+
+	if(pos == handler)goto list_failed;
+
+	return pos;
+list_failed:
+	return NULL;
+}
+
+skiPosition_t skiList_next(skiHandler_t handler, skiPosition_t pos)
 {
 	if(!__identifyHead(handler))goto list_failed;
 	if(!__identifyNode(handler, pos))goto list_failed;
@@ -265,7 +289,7 @@ list_failed:
 	return NULL;
 }
 
-skiPosition_t skiList_posPrev(skiHandler_t handler, skiPosition_t pos)
+skiPosition_t skiList_prev(skiHandler_t handler, skiPosition_t pos)
 {
 	if(!__identifyHead(handler))goto list_failed;
 	if(!__identifyNode(handler, pos))goto list_failed;

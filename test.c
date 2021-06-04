@@ -211,7 +211,10 @@ struct _st{
 
 int pauseFunc(void* arg)
 {
-	printf("%s waiting\n", __func__);
+	//if(arg)
+		//printf("%s push waiting\n", __func__);
+	//else
+		//printf("%s pop waiting\n", __func__);
 	return 0;
 }
 
@@ -220,7 +223,7 @@ void* pushtest(void* hd)
 	struct _st *ptest_st = hd;
 
 	for(int i = 0; i < 1000; i++){
-		skiQue_push(ptest_st->hd, &ptest_st->i, pauseFunc, NULL);
+		skiQue_push(ptest_st->hd, &ptest_st->i, pauseFunc, &i);
 	}
 	return NULL;
 }
@@ -234,6 +237,7 @@ void* poptest(void* hd)
 	//sleep(1);
 
 	while(total < TEST_SIZE*1000){
+		//printf("total: %d\n", total);
 		skiQue_pop(hd, &v, pauseFunc, NULL);
 		if(v < 0 || v >= TEST_SIZE){
 			printf("error no. %d\n", v);
@@ -271,7 +275,7 @@ void que_test()
 
 	pthread_join(popid, NULL);
 
-	skiQue_destroy(hd);
+	//skiQue_destroy(hd);
 }
 
 void que_test01()
@@ -283,6 +287,14 @@ void que_test01()
 	while(v--)
 		skiQue_push(hd, &v, pauseFunc, NULL);
 
+}
+
+static int printSubBuffer(void* buffer, void* arg)
+{
+	skiHandler_t* buf = buffer;
+	if(buf && *buf)
+		printf("%s\n", skiBuffer_at(*buf, 0));
+	return 0;
 }
 
 void buf_test()
@@ -318,6 +330,21 @@ void buf_test()
 	skiBuffer_resize(copy, 5);
 	puts(skiBuffer_at(copy, 0));
 	skiBuffer_destroy(copy);
+
+	strcpy(buf, "abcd123abcdefg123hijkm123nopqrstu123vwxyz");
+	hdr = skiBuffer_create(buf, strlen(buf));
+
+	printf("%s\n", skiBuffer_at(hdr, 0));
+	skiHandler_t list = skiBuffer_split(hdr, "123", 3);
+	printf("%x\n", list);
+
+	skiList_foreach(list, printSubBuffer, NULL);
+
+	copy = skiBuffer_create("</a>", 4);
+	skiBuffer_destroy(hdr);
+	hdr = skiBuffer_join(copy, list);
+
+	printf("%s\n", skiBuffer_at(hdr, 0));
 }
 
 
@@ -378,7 +405,7 @@ int main()
 	//test_map();
 	que_test();
 	//que_test01();
-	//buf_test();
+	buf_test();
 	//hashMap_test();
 
 	return 0;
