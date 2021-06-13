@@ -5,23 +5,23 @@ static char skiQueID;
 typedef struct _circleQue{
 	size_t dataSize;
 	size_t capacity;
-	skiIndex_t rIdx, wIdx;
-	//skiIndex_t pushIdx, popIdx;
+	volatile skiIndex_t rdIdx, wtIdx;
+	skiIndex_t pushIdx, popIdx;
 	void* headID;
 	char data[0];
-}CclQue_t;
+}skiQue_t;
 
-#define __identifyHead(_pHead) ((_pHead) && ((CclQue_t*)_pHead)->headID == &skiQueID)
+#define __identifyHead(_pHead) ((_pHead) && ((skiQue_t*)_pHead)->headID == &skiQueID)
 
 
 skiHandler_t skiQue_create(size_t dataSize, unsigned char power)
 {
 	if(power > sizeof(size_t)*8)goto cque_failed;
 	size_t capacity = 1 << power;
-	CclQue_t* que = malloc(sizeof(CclQue_t) + (dataSize+1)*capacity);
+	skiQue_t* que = malloc(sizeof(skiQue_t) + (dataSize)*capacity);
 	if(que == NULL)goto cque_failed;
 
-	memset(que->data, 0, (dataSize)*capacity);
+	memset(que, 0, sizeof(skiQue_t) + (dataSize)*capacity);
 	que->dataSize = dataSize;
 	que->capacity = capacity - 1;
 	//que->readIdx = que->writeIdx = 0;
@@ -36,7 +36,7 @@ cque_failed:
 void skiQue_destroy(skiHandler_t handler)
 {
 	if(!__identifyHead(handler))goto cque_failed;
-	CclQue_t* que = handler;
+	skiQue_t* que = handler;
 	que->headID = NULL;
 
 	free(handler);
@@ -44,62 +44,63 @@ cque_failed:
 	return;
 }
 
-size_t skiQue_push(skiHandler_t handler, void* data, skiFunc1_t pauseFunc, void* arg)
+size_t skiQue_push(skiHandler_t handler, void* data, skiFuncPause_t pauseFunc, void* arg)
 {
 	if(!__identifyHead(handler))goto cque_failed;
-	CclQue_t* que = handler;
-	skiIndex_t rIdx = 0;
-	skiIndex_t wIdx = 0;
-	char* qData = NULL;
+	skiQue_t* que = handler;
+	skiIndex_t rdIdx = 0;
+	skiIndex_t pushIdx = 0;
+	size_t cnt = 0;
 
 	do{
 cque_resume:
-		rIdx = que->rIdx;
-		wIdx = que->wIdx;
-		qData = que->data + (wIdx&que->capacity)*(que->dataSize+1);
-		if((rIdx&que->capacity) == (wIdx&que->capacity) && qData[0] == 1){
+		rdIdx = que->rdIdx;
+		pushIdx = que->pushIdx;
+		//printf("%s: rdIdx = %lu, pushIdx = %lu, size = %d, capacity = %lu\n", __func__, rdIdx, pushIdx, pushIdx-rdIdx, que->capacity);
+		if(pushIdx - rdIdx >= que->capacity){
 			if(pauseFunc){
-				pauseFunc(arg);
+				pauseFunc(&cnt, arg);
+				cnt++;
 				goto cque_resume;
 			}else goto cque_failed;
 		}
-	}while(!SKI_ATMC_CSA_(que->wIdx, wIdx, wIdx+1));
+	}while(!SKI_ATMC_CSA_(que->pushIdx, pushIdx, pushIdx+1));
 
-	while(qData[0] == 1);
-	if(data)memcpy(qData + 1, data, que->dataSize);
-	SKI_ATMC_CSA_(qData[0], 0, 1);
+	if(data)memcpy(que->data + (pushIdx&que->capacity)*que->dataSize, data, que->dataSize);
+	else memset(que->data + (pushIdx&que->capacity)*que->dataSize, 0, que->dataSize);
+	while(!SKI_ATMC_CSA_(que->wtIdx, pushIdx, pushIdx+1));
 
-	return que->capacity;
+	return pushIdx - rdIdx;
 cque_failed:
 	return 0;
 }
 
-size_t skiQue_pop(skiHandler_t handler, void* data, skiFunc1_t pauseFunc, void* arg)
+size_t skiQue_pop(skiHandler_t handler, void* data, skiFuncPause_t pauseFunc, void* arg)
 {
 	if(!__identifyHead(handler))goto cque_failed;
-	CclQue_t* que = handler;
-	skiIndex_t rIdx = 0;
-	skiIndex_t wIdx = 0;
-	char* qData = NULL;
+	skiQue_t* que = handler;
+	skiIndex_t popIdx = 0;
+	skiIndex_t wtIdx = 0;
+	size_t cnt = 0;
 
 	do{
 cque_resume:
-		wIdx = que->wIdx;
-		rIdx = que->rIdx;
-		qData = que->data + (rIdx&que->capacity)*(que->dataSize+1);
-		if((rIdx&que->capacity) == (wIdx&que->capacity) && qData[0] == 0){
+		wtIdx = que->wtIdx;
+		popIdx = que->popIdx;
+		//printf("%s: popIdx = %lu, wtIdx = %lu, size = %d, capacity = %lu\n", __func__, popIdx, wtIdx, wtIdx-popIdx, que->capacity);
+		if(popIdx == wtIdx){
 			if(pauseFunc){
-				pauseFunc(arg);
+				pauseFunc(&cnt, arg);
+				cnt++;
 				goto cque_resume;
 			}else goto cque_failed;
 		}
-	}while(!SKI_ATMC_CSA_(que->rIdx, rIdx, rIdx+1));
+	}while(!SKI_ATMC_CSA_(que->popIdx, popIdx, popIdx+1));
 
-	while(qData[0] == 0);
-	if(data)memcpy(data, qData + 1, que->dataSize);
-	SKI_ATMC_CSA_(qData[0], 1, 0);
+	if(data)memcpy(data, que->data + (popIdx&que->capacity)*que->dataSize, que->dataSize);
+	while(!SKI_ATMC_CSA_(que->rdIdx, popIdx, popIdx+1));
 
-	return que->capacity;
+	return wtIdx - popIdx;
 cque_failed:
 	return 0;
 }
@@ -112,13 +113,8 @@ void skiQue_clear(skiHandler_t handler)
 size_t skiQue_size(skiHandler_t handler)
 {
 	if(!__identifyHead(handler))goto cque_failed;
-	CclQue_t* que = handler;
-	skiIndex_t rIdx = que->rIdx;
-	skiIndex_t wIdx = que->wIdx;
-	char* qData = que->data + (rIdx&que->capacity)*(que->dataSize+1);
-
-	if((rIdx&que->capacity) == (wIdx&que->capacity))return (que->capacity+1)*qData[0];
-	else return (wIdx - rIdx) & que->capacity;
+	skiQue_t* que = handler;
+	return que->wtIdx - que->rdIdx;
 cque_failed:
 	return 0;
 }

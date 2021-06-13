@@ -33,4 +33,6 @@ typedef int (*skiFuncIPP_t)(skiIndex_t, void*, void*);
 #define memmove __builtin_memmove
 #define memcmp __builtin_memcmp
 
+#define SKI_P2T(_p, _t)		(*(_t*)(_p))
+
 #endif
